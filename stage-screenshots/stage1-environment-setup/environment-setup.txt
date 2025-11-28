@@ -1,0 +1,114 @@
+Stage 1 - Environment Setup
+Goal: create a clean Linux server on AWS and prepare the directory foundations for the entire project.
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Stage 1 Run-Book (For my project and as my personal selection I'm using Amazon Linux for this project)
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+1.- Launchh You EC2 Instance (AWS Free Tier)
+
+Configuration
+AMI: 
+-Ubuntu Server 22.4 LTS 
+OR
+-Amazon Linux 2023 (AWS-native)
+
+Instance type: 
+- t2.micro or t2.micro (free Tier)
+
+Stoage: Default 8GB gp3
+
+Network:
+- Public subnet 
+- Auto-assign public IP: ENABLED
+
+Security Group (IMPORTANT)
+Allow only:
+- SSH -> port 22 -> Your IP (not 0.0.0.0/0)
+(Later during Stage 3, change the SSH port)
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+2.- Connet to the Instances via SSH
+On Mac/Linux:
+ 
+	chmod 400 yourkey.pem
+	ssh -i yourkey.pem ec2-user@PUBLIC_IP
+
+or Windows PowerShell:
+	ssh -i .\yourkey.pem ec2-user@PUBLIC_IP
+
+Expected:
+You should see something like:
+	Welcome to Amazon Linux 2023
+	ec2-user@ip-172-31-25-69
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+3.- Update the System (very important for security)
+
+Ubuntu instances:
+	sudo apt update && sudp apt upgrade -y
+
+Amazon Linux Instance:
+	 sudo dnf update -y 
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+4. Set a Hostname
+
+Set the hostname of your company:
+	sudo hostnamectl set-hostname corp-linux1
+
+verify:
+	hostname
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+5. Create the Directory Structure
+This structure will support the entire project:
+
+	sudo mkdir -p /dept/hr
+	sudo mkdir -p /dept/finance
+	sudo mkdir -p /dept/shared
+	sudo mkdir -p /backups
+
+Verify:
+	ls -R /dept
+
+You should see:
+	hr
+	finance
+	shared 
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+6.- Set Basic Ownership and Permissions
+For now, we give root ownership.
+(We will modify this Stage 2 when we create users/groups)
+	sudo chown root:root /dept -R
+	sudo chmod 775 /dept
+
+7.- Confirme Everything Works
+Run: 
+	df -h
+
+You should see the main disk with enough free space. 
+
+Run
+	tree /dept
+if tree is not installed:
+	sudo apt install tree -y
+or
+	sudo dnf install tree -y
+then 
+	tree /dept
+
+expected:
+/detp
+|_finance
+\_hr
+|_shared 
+
