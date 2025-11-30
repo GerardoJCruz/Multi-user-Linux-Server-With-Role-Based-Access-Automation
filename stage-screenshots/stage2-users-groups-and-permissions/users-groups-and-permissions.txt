@@ -1,0 +1,139 @@
+Stage 2 - Users, Groups & Permissions. 
+
+Goal: Create realistic corporate users, assign group roles, and control access to each deparment directory. 
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+1. Create Groups
+We need 3 groups:
+- hr
+- finance
+-interns
+
+run:
+ 
+	sudo groupadd hr
+	sudo groupadd finance
+	sudo groupadd interns
+verify:
+
+	getent group hr finance interns
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+2. Create Users
+We simulate 3 employees + 1 intern:
+
+User: Alice
+Role: HR
+Group:  hr
+
+User: BOb
+Role: Finance
+Group:  finance
+
+User: Carol
+Role: Finance
+Group:  finance
+
+User: intern1
+Role: Intern
+Group:  interns
+
+Create them (with home directories):
+
+	sudo useradd -m -s /bin/bash alice
+	sudo useradd -m -s /bin/bash bob
+	sudo useradd -m -s /bin/bash carol
+	sudo useradd -m -s /bin/bash intern1
+(Notes:
+-m is an optional flag that tells useradd to create  the user's home directory if it does not alrady exist. The home directory is typically located at /home/username
+-s /bin/bash is an optional flag that specifies the default login shell fo the new user. In this case, it assigns /bin/bash (the Bourne Again shell.)
+)
+
+Set temporary password (required for testing later):
+	
+	echo "alice:alice123" | sudo chpasswd
+	echo "bob:bob123" | sudo chpasswd
+	echo "carol:carol123" | sudo chpasswd
+	echo "intern1:intern123" | sudo chpasswd
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+3. Assign Users to Groups
+Note: -a (append) is a critical option when used with -G. It ensures that the user is added to the specified suppementary group(s) without removing them from any other groups they are already a member of. In many modern Linux distributions, a private group with the same name as the user is created by default as their primary group. 
+-G specifies the name of the supplementary group the user will join. 
+
+	sudo usermod -aG hr alice
+	sudo usermod -aG finance bob
+	sudo usermod -aG finance carol
+	sudo usermod -aG interns intern1
+Verify:
+	groups alice
+	groups bob
+	groups carol
+	groups intern1
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+4. Assign Directory Ownership.
+We will give HR ownership of the HR folder, Finance ownership of the finance folder, and rool will own shared. 
+
+HR directory
+	
+	sudo chown root:hr /dept/hr
+	sudo chmod 770 /dept/hr
+Finance directory
+
+	sudo chown root:finance /dept/finance
+	sudo chmod 770 /dept/finance
+
+Shared directory (read-only for interns)
+	sudo chown root:interns /dept/shared
+	sudo chmod 750 /dept/shared
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+5. Prevent Cross-Access
+This is done automatically by the permissions:
+- HR has 770 -> only HR group members + root
+- Finance has 770 -> only Finance group members + root
+- Interns have 750 on /dept/shared -> read-only for group, no write. 
+You can verify: 
+
+Test HR user access
+	sudo -u alice touch /dept/hr/testfile
+	sudo -u alice touch /dept/finance/should_fail
+Expected results:
+- The firs command should succeds
+- Second command will fails with "permission denied "
+
+Now test finance user access: 
+	sudo -u bob touch /dept/finance/testfile
+	sudo -u bob touch /dept/hr/should_fail
+Expected: We expect the same results as HR
+
+Now testing intern read-only:
+	sudo -u intern1 ls /dept/shared
+	sudo -u intern1 touch /dept/shared/will_fail
+Expected;
+- In this case the listing should work
+- The touch will fail (intern can only read, no write)
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+6. SetGID Bit(s) on a directory 
+Is a good practice to ensure every new ffile created inside HR/Finance inherits the group properly. 
+
+Notes:
+-Group Inheritance: Normally, when a user creates a new file or subdirectory, the new item belongs to the creator's primary group. 
+-SetGID Behavior: With g+s set on the parent directory (in this case we indicate /dept/hr), any new file or subdirectories created inside it will automatically inherit the group owenership of the parent directory (hr for this example), rather than the creator's primary group. 
+
+	sudo chmod g+s /dept/hr
+	sudo chmod g+s /dept/finance
+Verify:
+	ls -ld /dept/hr /dept/finance
+
+Expected: You should see the s in group permissions like this:
+	drwxrws--- 2 root hr ...
+	drwxrws--- 2 root finance ...
