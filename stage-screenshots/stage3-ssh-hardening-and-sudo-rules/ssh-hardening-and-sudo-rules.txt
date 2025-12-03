@@ -1,0 +1,113 @@
+Stage 3 - SSH Hardening & Sudo Rules
+Goal: Secure SSH access, enforce key-based authentication, change port, add idle timeout, and configure least-privilege sudo. 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+1. Require SSH Key Authentication Only (disable passwords)
+Edit the SSH configuration file:
+	sudo nano /etc/ssh/sshd_config
+Find and change (or add if missing):
+	PasswordAuthentication no
+	PubkeyAuthentication yes
+
+VERY IMPORTANT:
+Do NOT restart SSH yet - wait until after change port rules
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+2.Change the Default SSH Port 
+Choose something like 2222 or 2200.
+In /etc/ssh/sshd_config, find:
+	#Port 22
+Change to: 
+	Port 2222 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+3. Fix Your Security Group (AWS Console)
+	1. Got to EC2 -> Security Groups
+	2. Edit inbound rules. 
+	3. Add rule:
+		- Type: Custom TCP
+		- Port: 2222
+		- Source: My IP
+	4. Keep port 22 open temporarily
+We will delete the port 22 only after confirming the new port works. 
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+4. Add SSH Idle Timeout
+In /etc/ssh/sshd_config add: 
+	ClientAliveInterval 300
+	CLientAliveCountMax 0
+ClientAliveInterval: Configures the server to send a "keepalive" message to the client if not data has been received from the 
+client within the specified time period (300 seconds = 5 minutes, in this case).
+ClientAliveCountMax: This directive sets the maximun number of consecutive "CLient alive" messages (keepalive) that the SSH 
+server will send without receving a response from the client before disconnects the sessions. 
+The number of retries before termination is 0 in this case. 
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+5. Restart SSH Service. 
+Now that: 
+- Key authentication is enabled
+- Password auth is disabled
+- New SSH port is open in firewall. 
+You can restart safely. 
+	sudo systemctl restart sshd
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+6. Test the New SSH Port (DO NOT skip this)
+Open a new terminal (keep the old one open in case you need recovery):
+	ssh -i yourkey.pem ec2-user@PUBLIC_IP -p 2222
+If this works -> great. 
+If not -> check the configurations you did previusly in the original terminal you had. Check the configuration and security group. 
+DO NOT close the original terminal till you are able to connect through the new port.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+7. Remove Port 22 (after successful login test)
+Delete the inbound rule for port 22 in AWS Security Group
+This protects against brute-force attacks on port 22. 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+8. Configure Least-Privilege Sudo 
+Goal: 
+- HR user -> no sudo
+- Finance users -> no sudo 
+- Intern -> no sudo 
+- Only your admin user (ec2-user) has sudo
+
+Open sudoers:
+	sudo visudo
+Inside, make sure there is only:
+	ec2-user All-(ALL) NOPASSWD:ALL
+Remove any auto-created sudo permissions for your project users. 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+9. Verify Sudo Restrictions 
+Test: 
+	sudo -u alice sudo ls /root
+Expected:
+alice is not in the sudoers file. This incident will be reported. 
+
+Test for finance users:
+	sudo -u bob sudo ls /root
+Same expected result. 
+
+Intern 
+	sudo -u intern1 sudo ls /root
+Also denied. 
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+10. Test that Key Authentication is Working Correctly. 
+Try loggin in without the key:
+	ssh ec2-user@PUBLIC_IP -p 2222
+Expected:
+	Permission denied (publickey)
+This means the system is secure. 
+
