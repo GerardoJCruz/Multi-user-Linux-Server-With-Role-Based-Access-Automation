@@ -1,0 +1,117 @@
+Stage 4 - Install, Enable & Monitor a Linux Service
+Goal: Install a service (Apache), start it, enable it on boot, view logs with journalctl, simulate a failure, and fix it. 
+
+This stage give you real-world admin skills:
+- systemctl managment
+- log reading
+- service troubleshooting
+- permissions and config awarness
+
+-----------------------------------------------------------------------------------------------------------------------------------
+ 
+1. Install Apache (httpd)
+Amazon Linux uses httpd (Apache)
+Update and install;
+	sudo yum update -y 
+	sudo yum install -y httpd
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+2. Enable and Start the Service
+	sudo systemctl enable httpd
+	sudo systemctl start httpd
+Check status:
+	systemctl status httpd
+Expected:
+- Active: active (running)
+- loaded from /usr/lib/systemd/system/httpd.service
+
+--------------------------------------------------------------------------------------------------------------------------------------
+
+3. Verify Web Server is Working
+Allow HTTP traffic in your EC2 security group:
+- Inbound rule:
+	- Type: HTTP
+	- Port: 80
+	- Source: MyIP (recommended) or Anywhere (0.0.0.0/0)
+Then Check in your browser:
+	http://YOUR_EC2_PUBLIC_IP
+You should see the Amazon Linux Test Page. 
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+4. Explore Service Logs with journalctl
+View only Apache logs:
+	sudo journalctl -u httpd
+Show last 30 lines:
+	sudo journalctl -u httpd -n 30
+Follow logs live (like tail -f):
+	sudo journalctl -u httpd -f
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+5. Simulates a Failure (Very important practice)
+Stop Apache:
+	sudo systemctl stop httpd
+Check status:
+	systemctl status httpd
+Expected: 
+- Active: inactive (dead)
+Try accesing the website again -> it should fail. 
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+6. Fix the Failure
+Start the service again:
+	sudo systemctl start httpd
+Check: 
+	systemctl status httpd
+Now simulated a more realistic failure:
+
+BREAK THE CONFIGURATION FILE
+	sudo nano /etc/httpd/conf/httpd.conf
+Find any line like;
+	ServerAdmin root@localhost
+Break it intentionally by removing  a quote or adding junk, like:
+	ServerAdmin root@localhost "
+Save and exit
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+7. Try Restarting the Service (expect failure)
+	sudo systemctl restart httpd
+It will fail.
+Check logs:
+	sudo journalctl -u httpd -n 20
+You should see errors like "Systax error".
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+8. Fix the broken Config
+Open the file again:
+	sudo nano /etc/httpd/conf/httpd.conf
+Undo your mistake
+Now check configuration:
+	sudo apachectl configtest
+Expected:
+	Syntax OK
+Restart:
+	sudo systemctl restart httpd
+Check status again:
+	systemctl status httpd
+Now your web server works again. 
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+9. Confirm It Auto-Starts on Boot
+Check if enabled
+	systemctl is-enabled httpd
+Expected:
+	enabled
+Reboot the instance:
+	sudo reboot
+After reconecctting on port 2222;
+	systemctl status httpd
+Expected: 
+- active (running)
+- started at boot
