@@ -1,0 +1,105 @@
+STAGE 5 - Automated Nightly Backups Using Cron + Tar
+Goal: Create a reliable backup system that compress your deparment folders every night into a /backups directory with a timestamp. 
+
+This mirrors what juniors sysadmins do in small companies. 
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+1. Create the Backup Directory
+All backups will live under /backups
+	sudo mkdir -p /backups
+	sudo chmod 700 /backups
+Why 700?
+Only root should read/write/execute backup files.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+2. Create the Backup Script
+Location (best practice):
+	/usr/local/bin/backups_depts.sh
+Create it;
+	sudo nano /usr/local/bin/backups_depts.sh
+Paste this script. 
+	#!/bin/bash
+
+	# Backup directory
+	BACKUP_DIR="/backups"
+	DATE=$(date +"%Y-%m-%d_%H-%M-%S")
+	FILE="dept_backup_$DATE.tar.gz"
+
+	# Source directory
+	SOURCE="/dept"
+
+	# Create backup
+	tar -czf $BACKUP_DIR/$FILE $SOURCE 2>/var/log/backup_errors.log
+
+	# Optional: Delete backups older than 14 days
+	find $BACKUP_DIR -type f -mtime +14 -name "*.tar.gz" -exec rm {} \;
+Save and exit
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+3. Make the Script Executable
+	sudo chmod +x /usr/local/bin/backups_depts.sh
+
+----------------------------------------------------------------------------------------------------------------------------------
+
+4. Test the Script Manually (Very Important)
+
+	sudo /usr/local/bin/backups_depts.sh
+Check result:
+	ls -lh /backups
+You should see something like this:
+	dept_backup_2025-01-12_03-00-01.tar.gz
+If something fails: 
+- check /var/log/backup_errors.log
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+5. Create a Cron Job That Runs Nightly
+
+Open root's crontab
+	sudo crontab -e 
+Add the backup schedule 
+	0 2 * * * /usr/local/bin/backups_depts.sh
+This runs every night at 2:00 AM
+(2 AM is common because the server is less busy)
+
+To verify cron is installed and running:
+	systemctl status crond
+ if disabled: 
+	sudo systemctl enable --now crond
+
+--------------------------------------------------------------------------------------------------------------------------------------
+
+6. Verify Cron Entry 
+	sudo crontab -l 
+Expect something like this:
+0 2 * * * /usr/local/bin/backups_depts.sh
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+7. Log Backups (This is optional but allows better monitoring)
+
+Append logs:
+Edit Script: 
+	sudo nano /usr/local/bin/backups_depts.sh
+Add this line at the end:
+	echo "Backup created on $(date)" >> /var/log/backup.log
+Then check the logs:
+	cat /var/log/backup.log
+
+--------------------------------------------------------------------------------------------------------------------------------------
+
+8. Simulate a Point-in-Time Restore (Realistic practice)
+Pick any backup:
+	sudo ls /backups
+Create a test restore folder:
+	sudo mkdir /restore_test
+Restore a backup:
+	sudo tar -xzf /backups/dept_backup_XXXX.tar.gz -C /restore_test
+verify folder structure:
+	lS /restore_test
+Expect to see the folder "detps" in this case, but with the caracteristics of that point-in-timme
+
+
