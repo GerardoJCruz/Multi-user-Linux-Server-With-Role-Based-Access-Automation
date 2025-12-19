@@ -1,0 +1,20 @@
+# Set the relay host to Amazon SES
+relayhost = [YOUR_SES_REGION_ENDPOINT]:587
+
+# Enable SASL authentication
+smtp_sasl_auth_enable = yes
+smtp_sasl_security_options = noanonymous
+
+# Specify the file where credentials will be stored
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+
+# Enable TLS encryption
+smtp_use_tls = yes
+smtp_tls_security_level = encrypt
+
+# Use the system's certificate bundle
+smtp_tls_CAfile = /etc/ssl/certs/ca-bundle.crt
+
+# Map system users to a verified SES sender email
+smtp_generic_maps = hash:/etc/postfix/generic
+

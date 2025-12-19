@@ -1,0 +1,125 @@
+Stage 6 - Disk Usage Monitoring Script 
+Goal: Add a robust bash script that checks disk usage, logs alerts, and can optionally email alerts. 
+Put it in /usr/local/bin, make it executable, schedule it, and test by simulating high disk usage. 
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+1. Script (You can copy the script from the folder scripts)
+Create file /usr/local/bin/disk_monitor.sh
+
+Make it executable and secure: 
+	sudo chmod 750 /usr/local/bin/disk_monitor.sh
+	sudo chown root:root /usr/local/bin/disk_monitor.sh
+	sudo touch /var/log/disk-usage.log
+	sudo chown root:root /var/log/disk-usage.log
+	sudo chmod 640 /var/log/disk-usage.log
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+2. Test script manually 
+Run: 
+	sudo /usr/local/bin/disk_monitor.sh
+	tail -n 50 /var/log/disk-usage.log
+You should see an OK entry. 
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+3. Simulate high disk usage (safe test)
+Create a temporary large file on the filesystem to push usage over threshold 
+(use a test mount if possible; do not fill root on critical systems).
+
+Examples (creates a 5.5GB file in home directory ~/ - remove after test):
+	# Create a large file (adjust size as needed)
+	sudo fallocate -l 5.5G ~/filltest.dat
+	# re-run the monitor
+	sudo /usr/bin/disk_monitor.sh
+	tail -n 20 /var/log/disk-usage.log
+	# cleanup
+	sudo rm ~/filltest.dat
+
+If fallocate is not available, use dd: 
+After cleanup, re-run the script to ensure it returns to OK. 
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+4. Schedule it with cron
+Edit root crontab:
+	sudo crontab -e 
+Add a job to run every 15 minutes (adjust as desired):
+	*/15 * * * * /usr/local/bin/disk_monitor.sh >/dev/null 2>&1
+Save. Verify cron is enabled: 
+	sudo systemctl status crond
+If disabled 
+	sudo systemctl enable --now crond
+
+Check cron log or your script logfile after 15 minutes to confirm it ran
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+5. Optional - Email alets
+As we're working in an instance, we can install and configure Postfix to send emails via your verified AWS SES identity. 
+Notes:
+
+Identity: Is a verified email address or domain that proves you own it, allowing you to send or recieve emails through SES, 
+with domain identities covering all sub-emails, simplifying setup. 
+
+SMTP: is the workhorse for sending emails over the internet, acting like a digital post office
+
+A) Before starting, make sure you havve the following information handy:
+Verify the Sender: In the AWS SES console, verify the email address (e.g., alerts@yourdomain.com) or 
+domain you plan to use as the sender.
+
+-Generate SMTP Credentials: Create SMTP credentials in the IAM service that will be used by Postfix to authenticate with SES. 
+This provides a username and a password. Do not use your main AWS console login credentials.
+
+-Identify SES Endpoint: Note the SES SMTP endpoint for your region (e.g., email-smtp.us-east-1.amazonaws.com) 
+and the port (usually 587).
+
+B) Install Postfix and SASL 
+	#Update packages and install postfix, sasl, and mailx
+	sudo dnf update -y 
+	sudo dnf install -y postfix mailx
+
+C) Configure Postfix Main File
+	sudo nano /etc/postfix/main.cf
+
+In the file postfix-configuration-lines.txt you'll find the lines you need to add at the end of main.cf file 
+You'll have to replace YOUR_SES_REGION_ENDPOINT with your SES endpoint
+
+D) Create Credential File (sasl_passwd)
+	sudo nano /etc/postfix/sasl_passwd
+Add a single line with your SES endpoint, username, and password:
+	[YOUR_SES_REGION_ENDPOINT]:587 YOUR_SMTP_USERNAME:YOUR_SMTP_PASSWORD
+Replace all three placeholders with your actual values
+
+E) Secure and Map Credentials 
+	# Secure the file permissions
+	sudo chmod 600 /etc/postfix/sasl_passwd
+	
+	#Build the Postfix database map
+	sudo postmap /etc/postfix/sasl_passwd
+
+F) Map system user to verify sender 
+-Create the generic mapping file
+	sudo nano /etc/postfix/generic
+-Add lines mapping the system user to your verified email 
+	ec2-user@corp-linux1.localdomain gjaviercruz@gmail.com
+	ec2-user gjaviercruz@gmail.com
+	root@corp-linux1.localdomain gjaviercruz@gmail.com
+	root gjaviercruz@gmail.com
+	@corp-linux1.localdomain gjaviercruz@gmail.com
+
+- Build the Postfix generic map
+	sudo postmap /etc/postfix/generic
+
+G) Restart Postfix
+Restart the service to load all the new configurations:
+	sudo systemctl enable postfix
+	sudo systemctl restart postfix
+
+H) Finally update and run the script
+Uncomment the line in the disk_monitor.sh file and test the email sending faking out the high disk usage
+	# Optional: send email (requires mailx or sendmail configured)
+	 echo "$MSG" | mailx -s "Disk usage alert on $(hostname)" your_external_email@example.com
+
+
