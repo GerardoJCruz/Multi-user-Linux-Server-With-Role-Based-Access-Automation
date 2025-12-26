@@ -1,0 +1,129 @@
+tage 7 - Log Management & Troubleshooting
+Goals:
+- Reading logs 
+- Searching for problems 
+- Compressing & archivinng logs
+- Basic troubleshooting methodology
+
+-----------------------------------------------------------------------------------------------------------------------------
+1. Explore /var/log
+
+Check what logs exist: 
+Exist two different way to check the logs in your server: Legacy System (rsyslog) and Modern systemd (journalctl).
+The legacy loggin refers to older methods or specific systems (like Veritas, NetBackup or older charms/API) still using 
+traditional log file in /var/log (e.g., syslog, auth.log), distinct from modern centrilized loggin system or newer
+unified approaches, often involving direct file writes and standard deamos like syslog. It's the baseline, plain-text 
+logging most Linux systems use, relying on utilities like tail, grep, and less for analysis, unlike newer setups
+that might push logs to central servers. 
+
+In other hand, journalctl is a command-line utility in modern Linux used to view and manage log data collected by the 
+systemd logging service, systemd-journald. It provides a centralized, structured, and efficient way to access logs 
+from various sources including the kernel, services, and appliations, which are stored in a binary format insted of 
+traditional plain-text-files. 
+
+Here's a table comparing some commun legacy logging files with their modern equivalents commands to see the same 
+information and use it for troubleshooting. You can see the list of the files i f your run the command 
+	ls -lh /var/log
+
+Equivalents for the most common files listed by the command;
+
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+| Meaning             | File                 | modern journalctl commands      | Why this command?                         |
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+| SSH, sudo attempts  | /var/log/secure      | sudo journalctl -t sshd -t sudo | Filter the "tags" (-t) used by the SSH    |
+|                     |                      |                                 | deamon and the sudo process               |
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+| General system logs | /var/log/messages    | sudo journalctl                 | The base command shows the entire         |
+|                     |                      |                                 | general system log in chronological order |
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+| Time sysnc          | /var/log/chronyd.log | sudo journalctl -u chronyd      | Filter specifically for the chronyd       |
+|                     |                      |                                 | service (time synchronization deamon)     |
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+| Package install     | /var/log/dnf.log     | sudo journalctl -u dnf          | Monitors the activity of the dnf package  |
+|                     |                      |                                 | manager service                           |
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+| Web server logs  if | /var/log/httpd       | sudo journalctl -u httpd        | Captures standar output and errors from   |
+| Apache installed    |                      |                                 | the Apache web server services            |
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+| Web Server logs if  | /var/log/nginx       | sudo journalctl -u nginx        | Captures standard output and errors from  |
+| Ngnix installed     |                      |                                 | the Nginx web server services             |
+|---------------------+----------------------+---------------------------------+-------------------------------------------|
+
+---------------------------------------------------------------------------------------------------------------------------
+
+2. Find Failed SSH Login Attempts
+This is on of the most common real-world tasks. 
+I'll share you how to find the same information using Legacy Logging and the journalctl so you can try the one that works 
+better for you and your system. 
+Remember in old systems failed SSH attempts will be find in: /var/log/secure
+
+Search for failure: 
+| Legacy Logging                     | journalctl command          |
+| sudo grep "Failed" /var/log/secure | sudo journalctl -g "Failed" |
+
+Search for invalid or unknown users:
+| Legacy Logging                         | journalctl command           |
+| sudo grep -i "invalid" /var/log/secure | sudo journalctl -g "invalid" |
+
+Count the number of failed attempts:
+| Legacy Logging                        | journalctl command                                                      |
+| sudo grep -c "Failed" /var/log/secure | sudo journalctl SYSLOG_FACILITY=4 SYSLOG_FACILITY=10 | grep -c "Failed" |
+
+
+Check attacks from a specific IP:
+For Legacy Logging: sudo grep "Failed" /var/log/secure | grep "192.168.1.50"
+For journalctl:  sudo journalctl -g "Failed.192.168.1.50"
+
+------------------------------------------------------------------------------------------------------------------------------
+
+3. Compress Old Logs
+-Find logs older than 7 days 
+	Legacy Logging: sudo find /var/log -type f -mtime +7 
+or
+	journalctl command:  journalctl --until "7 days ago"
+
+-Compress manually
+	sudo gzip /var/log/secure-2025110
+Or 
+	sudo tar -czvf logs-archive.tar.gz /var/log/httpd/
+
+In the case of journalctl, it manages compressed journal files automaticallly (using gzip by default for large logs)
+
+
+- Rotate Apache or Nginx logs manually;
+	Legacy Logging: sudo rotatelogs
+or 
+	journalctl command: sudo journalctl --rotate
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+4. Simulate a Real Troubleshooting Scenario. 
+
+Let's simulate a common issue: User cannot log in via SSH
+
+Step A - Lock a user
+	sudo usermod -L alice
+
+Step B - Try a log in from a second terminal 
+It should fail. 
+	
+Step C - Check the logs
+	sudo tail -n 20 /var/log/secure
+Expected output 
+	Authentication failure for alice
+
+Step D - Fix the issue
+	sudo usermod -U alice 
+Retry login
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+5. Documment Troubleshooting steps
+create a file 
+	mkdir ~/project-docs
+	nano ~/project-docs/troubleshooting-log.txt
+Document:
+- Symptoms
+- Log entries
+- Cause
+- Fix applied 
