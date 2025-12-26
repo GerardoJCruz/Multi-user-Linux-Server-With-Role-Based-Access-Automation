@@ -1,0 +1,78 @@
+Project - Multi-User Linux Server With Role-based Access & Automation
+Full Roadmap
+
+------------------------------------------------------------------------------------------------------
+
+Stage 1 - Environment Setup 
+- Launch EC2 (Amazon Linux 2023)
+- Basic security group configuration
+- Connect via SSH
+- Update packages
+- Configure hostname
+- Create project directory structure
+	- /dept/hr
+	- /dept/finance
+	- /dept/shared
+	- /backups
+
+------------------------------------------------------------------------------------------------------
+
+Stage 2 - Users, Group & Permissions 
+- Create groups: hr, finance, interns
+- Create users: alice, bob, carol, intern1
+- Set user password (temporary)
+- Assign groups
+- Configure permissions:
+	- HR -> RW on /dept/hr
+	- Finance -> RW on /dept/finance
+	- Intern -> Read-only on /dept/shared
+-Remove cross-access between HR and Finance
+- Validate permissions as each user. 
+
+---------------------------------------------------------------------------------------------------------
+
+Stage 3 - SSH Hardening & Sudo Rules 
+- Disable password authentication
+- Require SSH key authentication only
+- Change default SSH port
+-Set idle timeout policy
+- Configure /etc/sudoers with least privilege. 
+- Test SSH access & sudo restrictions 
+
+----------------------------------------------------------------------------------------------------------
+ 
+Stage 4- Install & Monitor a Linux Service 
+- Install Apache or Nginx
+- Start& enable service with systemctl
+- Review logs using:
+	- journalctl
+	-/var/log/ files
+- Simulates a failure
+- Troubleshoot & fix service
+
+-------------------------------------------------------------------------------------------------------------
+
+Stage 5 - Automated Nightly Backups with Cron
+- Create a shell script using tar
+- Include the date in filename
+- Store backups in /backups
+- Create cron jobs for nightly execution
+- Test the script manually. 
+
+---------------------------------------------------------------------------------------------------------------
+
+stage 6 - Disk Usage Monitoring Script
+- Write a Bash Script:
+	- to check df -h
+	- log alert or email if disk > 80%
+- Store script in /usr/local/bin
+- Add executable permissions
+- Test script with simulated conditions
+
+--------------------------------------------------------------------------------------------------------------
+
+Stage 7 - Log Management & Troubleshooting 
+- Explore /var/log
+- Use grep to locate failed SSH login attempts
+- Compress old logs with gzip or tar
+- Document any troubleshooting steps
