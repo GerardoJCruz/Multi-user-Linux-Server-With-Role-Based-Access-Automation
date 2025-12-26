@@ -1,0 +1,53 @@
+In this file I'll share with you how to read and understand a general log. I cant feel like looking at a wall of code at the beginning, but one you break down the anatomy of a single line, they become very easy to understand. 
+
+Example used: 
+Dec 20 03:13:39 corp-linux1 audit[1006037]: USER_START pid=1006037 uid=1000 auid=1000 ses=1109 subj=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 msg='op=PAM:session_open grantors=pam_keyinit,pam_limits,pam_keyinit,pam_limits,pam_systemd,pam_unix acct="root" exe="/usr/bin/sudo" hostname=? addr=? terminal=/dev/pts/2 res=success' 
+
+1.- The General Anatomy of a Log Line. 
+Every line follows a standard structure from left to right:
+|------------+-----------------+-------------------------------------------------------------------------------|
+| Part       | Example         | What it tells you                                                             |
+|------------+-----------------+-------------------------------------------------------------------------------|
+| Timestamp  | Dec 20 03:13:39 | Exactly when the event happened                                               |
+|------------+-----------------+-------------------------------------------------------------------------------|
+| Hostname   | corp-linux1     | Which server generated the log                                                |
+|------------+-----------------+-------------------------------------------------------------------------------|
+| Source     | audit[1006037]  | The service reporting the event. audit is the Linux Kernel's security auditor |
+|------------+-----------------+-------------------------------------------------------------------------------|
+| Event Type | USER_START      | A keyword telling you what kind of event happened (Start, End, Command, etc.) |
+|------------+-----------------+-------------------------------------------------------------------------------|
+
+2. The "Audit" Language (The msg= part)
+The text inside the single quotes msg='...' is the "meat" of the log. Here are the most important labels to look for:
+- uid=1000: The User ID of the person who initiated the action.
+- audi=1000: This stands for "Audit User ID". It is the original ID of the person who logged in, even if they switched to root.
+- acct="root": The account name that the action was performed on. In this case, shows sudo was used to act as root.
+- exe="/usr/bin/sudo": The actual program that was executed.
+- res=success: Did it work? success means the command was allowed and executed. 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+3. Decoding the "Secret" USER_CMD line
+Look at this specific line from a tail output:
+... USER_CMD ... cmd=7461696C202D6E2033202D66202F7661722F6C6F672F6D65737361676573 ...
+
+The long string of numbers and letters after cmd= is Hexadecimal. Linux encodes the command you type so that special characters don't break the log file. 
+- If you translate 7461696c... from the Hex to Text, it says something like this: tail -n 3 -f /var/log/messages.
+- This is the log "logging" the fact that you ran the tail command
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+4. tail vs. journalctl: What's the difference?
+If you run tail -f /var/log/messages and journalctl -f you can notice that those two commands show almost identical information. 
+- tail -f /var/log/messages: You are reading the Text file that rsyslog created. It is easy to read but harder to search. 
+- sudo journalctl -f: You are reading directly from the binary journal database. 
+	- The journal often shows a "prettier" version of the audit logs that is easier for humans to read than the raw audit strings. 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+Summary: What happened in your logs?
+In plain English, your logs are saying:
+1. User 1000 (typically the first user created during the system isntallation) asked to use sudo. 
+2. PAM (Pluggable Authentication Modules) checked your permissions. 
+3. A session was opened as root. 
+4. The command tail  -f /var/log/messages was succesfully executed.
